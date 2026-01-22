@@ -1,7 +1,312 @@
-john_user_email="user+john@email.com"
-jane_user_email="user+jane@email.com"
-alex_user_email    = "alexandru@email.com"
-oladele_user_email = "oladele@email.com"
-teleport_saml      = "https://REPLACE_WITH_TENANT.teleport.sh:443/v1/webapi/saml/acs/ad"
-aws_saml_acs="SEE_README.MD_FOR_HOW_TO_FETCH_VALUE"
-aws_saml_entity_id="SEE_README.MD_FOR_HOW_TO_FETCH_VALUE"
+#################################################
+# AWS SSO Configuration
+#################################################
+# Get these values from AWS IAM Identity Center > Settings > Identity source
+
+aws_saml_entity_id = "https://us-east-1.signin.aws.amazon.com/platform/saml/d-xxxxxxxxxx"
+aws_saml_acs       = "https://us-east-1.signin.aws.amazon.com/platform/saml/acs/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+aws_sso_loging_url = "https://d-xxxxxxxxxx.awsapps.com/start"
+
+#################################################
+# Users
+#################################################
+# Key is used as identifier, user_principal_name = email
+
+identity_users = {
+  # Admins
+  john_smith = {
+    display_name       = "John Smith"
+    given_name         = "John"
+    surname            = "Smith"
+    azure_ad_user_type = "Member" # Created in directory with password
+  }
+
+  # Platform/DevOps team
+  jane_doe = {
+    display_name       = "Jane Doe"
+    given_name         = "Jane"
+    surname            = "Doe"
+    azure_ad_user_type = "Member"
+  }
+
+  # Developer
+  bob_wilson = {
+    display_name       = "Bob Wilson"
+    given_name         = "Bob"
+    surname            = "Wilson"
+    azure_ad_user_type = "Guest" # External user, invited via email
+  }
+
+  # Data team
+  alice_chen = {
+    display_name       = "Alice Chen"
+    given_name         = "Alice"
+    surname            = "Chen"
+    azure_ad_user_type = "Guest"
+  }
+
+  # Security
+  mike_security = {
+    display_name       = "Mike Security"
+    given_name         = "Mike"
+    surname            = "Security"
+    azure_ad_user_type = "Member"
+  }
+}
+
+#################################################
+# Groups
+#################################################
+# Typical groups for a multi-account AWS environment
+
+identity_groups = {
+  # Full administrative access
+  admins = {
+    description = "Organization administrators with full access"
+    members     = ["john_smith"]
+  }
+
+  # Platform/Infrastructure team
+  platform = {
+    description = "Platform team - manages infrastructure, CI/CD, and shared services"
+    members     = ["jane_doe", "john_smith"]
+  }
+
+  # Developers
+  developers = {
+    description = "Development team - access to dev/staging environments"
+    members     = ["bob_wilson", "jane_doe"]
+  }
+
+  # Data engineering/analytics
+  data_team = {
+    description = "Data team - access to data lakes, analytics, and ML resources"
+    members     = ["alice_chen"]
+  }
+
+  # Security team
+  security = {
+    description = "Security team - audit, compliance, and security operations"
+    members     = ["mike_security", "john_smith"]
+  }
+
+  # Read-only access for auditors/stakeholders
+  readonly = {
+    description = "Read-only access for auditors and stakeholders"
+    members     = ["alice_chen", "bob_wilson"]
+  }
+
+  # Billing access
+  billing = {
+    description = "Billing and cost management access"
+    members     = ["john_smith"]
+  }
+}
+
+#################################################
+# Permission Sets
+#################################################
+# Typical permission sets for different roles
+
+permission_sets = {
+  # Full administrator access
+  administrator = {
+    description      = "Full administrative access to all AWS services"
+    session_duration = "PT4H" # 4 hours for security
+    managed_policies = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+  }
+
+  # Power user (everything except IAM)
+  power_user = {
+    description      = "Full access to AWS services except IAM"
+    session_duration = "PT8H"
+    managed_policies = ["arn:aws:iam::aws:policy/PowerUserAccess"]
+  }
+
+  # Platform/DevOps engineer
+  platform_engineer = {
+    description      = "Infrastructure and DevOps access"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/PowerUserAccess",
+      "arn:aws:iam::aws:policy/IAMReadOnlyAccess"
+    ]
+  }
+
+  # Developer access
+  developer = {
+    description      = "Developer access - compute, storage, serverless"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/AWSLambda_FullAccess",
+      "arn:aws:iam::aws:policy/AmazonS3FullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+      "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+      "arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+      "arn:aws:iam::aws:policy/CloudWatchFullAccess",
+      "arn:aws:iam::aws:policy/AWSCloudFormationFullAccess"
+    ]
+  }
+
+  # Data engineer
+  data_engineer = {
+    description      = "Data engineering access - analytics, ML, data lakes"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/AmazonS3FullAccess",
+      "arn:aws:iam::aws:policy/AmazonAthenaFullAccess",
+      "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess",
+      "arn:aws:iam::aws:policy/AmazonRedshiftFullAccess",
+      "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess",
+      "arn:aws:iam::aws:policy/AmazonEMRFullAccessPolicy_v2"
+    ]
+  }
+
+  # Security auditor
+  security_auditor = {
+    description      = "Security audit and compliance access"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/SecurityAudit",
+      "arn:aws:iam::aws:policy/AWSCloudTrail_ReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AmazonGuardDutyReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AWSConfigUserAccess",
+      "arn:aws:iam::aws:policy/IAMReadOnlyAccess"
+    ]
+  }
+
+  # Read-only access
+  read_only = {
+    description      = "Read-only access to all AWS resources"
+    session_duration = "PT8H"
+    managed_policies = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+  }
+
+  # Billing access
+  billing = {
+    description      = "Billing and cost management access"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess",
+      "arn:aws:iam::aws:policy/AWSCostAndUsageReportAutomationPolicy"
+    ]
+  }
+
+  # Network administrator
+  network_admin = {
+    description      = "Network administration - VPC, Route53, CloudFront"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/AmazonVPCFullAccess",
+      "arn:aws:iam::aws:policy/AmazonRoute53FullAccess",
+      "arn:aws:iam::aws:policy/CloudFrontFullAccess"
+    ]
+  }
+
+  # Database administrator
+  database_admin = {
+    description      = "Database administration access"
+    session_duration = "PT8H"
+    managed_policies = [
+      "arn:aws:iam::aws:policy/AmazonRDSFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+      "arn:aws:iam::aws:policy/AmazonElastiCacheFullAccess",
+      "arn:aws:iam::aws:policy/AmazonDocDBFullAccess"
+    ]
+  }
+}
+
+#################################################
+# Group Permission Assignments
+#################################################
+# Assign groups to permission sets for specific AWS accounts
+# Replace account IDs with your actual account IDs
+
+group_permission_assignments = [
+  # Management account - only admins
+  {
+    group          = "admins"
+    permission_set = "administrator"
+    account_id     = "111111111111" # Management account
+  },
+
+  # Production account
+  {
+    group          = "admins"
+    permission_set = "administrator"
+    account_id     = "222222222222" # Production
+  },
+  {
+    group          = "platform"
+    permission_set = "platform_engineer"
+    account_id     = "222222222222"
+  },
+  {
+    group          = "security"
+    permission_set = "security_auditor"
+    account_id     = "222222222222"
+  },
+  {
+    group          = "readonly"
+    permission_set = "read_only"
+    account_id     = "222222222222"
+  },
+
+  # Staging account
+  {
+    group          = "admins"
+    permission_set = "administrator"
+    account_id     = "333333333333" # Staging
+  },
+  {
+    group          = "platform"
+    permission_set = "platform_engineer"
+    account_id     = "333333333333"
+  },
+  {
+    group          = "developers"
+    permission_set = "developer"
+    account_id     = "333333333333"
+  },
+
+  # Development account
+  {
+    group          = "admins"
+    permission_set = "administrator"
+    account_id     = "444444444444" # Development
+  },
+  {
+    group          = "platform"
+    permission_set = "power_user"
+    account_id     = "444444444444"
+  },
+  {
+    group          = "developers"
+    permission_set = "power_user"
+    account_id     = "444444444444"
+  },
+
+  # Data/Analytics account
+  {
+    group          = "admins"
+    permission_set = "administrator"
+    account_id     = "555555555555" # Data account
+  },
+  {
+    group          = "data_team"
+    permission_set = "data_engineer"
+    account_id     = "555555555555"
+  },
+  {
+    group          = "platform"
+    permission_set = "platform_engineer"
+    account_id     = "555555555555"
+  },
+
+  # Billing - billing group on management account
+  {
+    group          = "billing"
+    permission_set = "billing"
+    account_id     = "111111111111"
+  },
+]

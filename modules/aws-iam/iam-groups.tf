@@ -1,21 +1,25 @@
-resource "aws_identitystore_group" "group" {
-  for_each = var.roles
+#################################################
+# AWS IAM Identity Center Groups (SCIM Provisioned)
+#################################################
+# With SCIM enabled, groups are automatically provisioned from Azure AD.
+# We use data sources to look up SCIM-synced groups for permission assignments.
+#
+# Note: Groups must be synced via SCIM before they can be referenced.
+# The initial terraform apply may fail if groups haven't synced yet.
+# Run SCIM sync first, then apply terraform.
+
+data "aws_identitystore_group" "scim_groups" {
+  for_each = var.groups
 
   identity_store_id = var.identity_store_id
-  display_name      = title(each.key)
-  description       = "${title(each.key)} group for access management."
-}
 
-resource "aws_identitystore_group_membership" "membership" {
-  for_each = {
-    for user_key, user in var.users :
-    "${user_key}-${user.role}" => {
-      user_key = user_key
-      role     = user.role
+  alternate_identifier {
+    unique_attribute {
+      attribute_path  = "DisplayName"
+      attribute_value = title(each.key)
     }
   }
-
-  identity_store_id = var.identity_store_id
-  group_id          = aws_identitystore_group.group[each.value.role].group_id
-  member_id         = aws_identitystore_user.user[each.value.user_key].user_id
 }
+
+# Group memberships are handled by SCIM sync from Azure AD.
+# No need to manage aws_identitystore_group_membership resources.

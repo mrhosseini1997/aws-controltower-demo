@@ -8,31 +8,29 @@ variable "sso_instance_arn" {
   description = "AWS SSO instance ARN"
 }
 
-variable "aws_account_id" {
-  type        = string
-  description = "Target AWS account ID for SSO role assignments"
-}
-
-variable "users" {
-  description = "Map of users and their attributes"
+variable "groups" {
+  description = "Map of group definitions (used to look up SCIM-synced groups)"
   type = map(object({
-    user_principal_name = string
-    display_name        = string
-    given_name          = string
-    surname             = string
-    email               = string
-    role                = string
-    mail_nickname       = optional(string, "")
-    azure_ad_user_type  = optional(string, "Guest")
+    description = string
   }))
 }
 
-variable "roles" {
-  description = "List of roles to create (used as group + permission set names)"
-  type        = map(string)
+variable "permission_sets" {
+  description = "Map of permission sets with policies"
+  type = map(object({
+    description          = string
+    session_duration     = optional(string, "PT8H")
+    managed_policies     = optional(list(string), [])
+    inline_policy        = optional(string, "")
+    permissions_boundary = optional(string, "")
+  }))
 }
 
-variable "role_policies" {
-  description = "Map of role name to AWS managed policy ARN"
-  type        = map(string)
+variable "group_permission_assignments" {
+  description = "List of group to permission set assignments per account"
+  type = list(object({
+    group          = string
+    permission_set = string
+    account_id     = string
+  }))
 }

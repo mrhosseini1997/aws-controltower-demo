@@ -1,56 +1,40 @@
 locals {
-  identity_users = {
-    alex = {
-      user_principal_name = var.alex_user_email
-      display_name        = "Alexandru Popa"
-      given_name          = "Alexandru"
-      surname             = "Popa"
-      email               = var.alex_user_email
-      mail_nickname       = "alexandru.popa"
-      role                = "admin"
-      azure_ad_user_type  = "Guest"
-    },
-    oladele = {
-      user_principal_name = var.oladele_user_email
-      display_name        = "Oladele Oloruntimilehin"
-      given_name          = "Oladele"
-      surname             = "Oloruntimilehin"
-      email               = var.oladele_user_email
-      mail_nickname       = "oladele.oloruntimilehin"
-      role                = "admin"
-      azure_ad_user_type  = "Guest"
-    },
-    jane = {
-      user_principal_name = var.jane_user_email
-      display_name        = "Jane Smith"
-      given_name          = "Jane"
-      surname             = "Smith"
-      email               = var.jane_user_email
-      mail_nickname       = "jane.smith"
-      role                = "platform"
-      azure_ad_user_type  = "Guest"
-    },
-    john = {
-      user_principal_name = var.john_user_email
-      display_name        = "John Doe"
-      given_name          = "John"
-      surname             = "Doe"
-      email               = var.john_user_email
-      mail_nickname       = "john.doe"
-      role                = "product"
-      azure_ad_user_type  = "Guest"
+  # Transform users - priority: email > user_principal_name > key
+  users_with_email = {
+    for user_key, user in var.identity_users :
+    user_key => {
+      display_name        = user.display_name
+      given_name          = user.given_name
+      surname             = user.surname
+      azure_ad_user_type  = user.azure_ad_user_type
+      user_principal_name = coalesce(user.email, user.user_principal_name, user_key)
+      email               = coalesce(user.email, user.user_principal_name, user_key)
+      mail_nickname       = coalesce(user.mail_nickname, replace(split("@", coalesce(user.email, user.user_principal_name, user_key))[0], ".", "-"))
     }
   }
-  identity_users_roles = {
-    platform = "Platform"
-    product  = "Product"
-    admin    = "Admin"
-  }
-  identity_users_role_policies = {
-    platform = data.aws_iam_policy.AdministratorAccess.arn
-    product  = data.aws_iam_policy.ReadOnlyAccess.arn
-    admin    = data.aws_iam_policy.AdministratorAccess.arn
+
+  # Derive Azure app roles from groups (group_key => Title Case display name)
+  azure_app_roles = {
+    for group_key, group in var.identity_groups :
+    group_key => title(replace(group_key, "_", " "))
   }
 
+  # Convert group-centric memberships to user-centric for compatibility
+  # From: group = { members = ["user1", "user2"] }
+  # To:   user1 = ["group1", "group2"]
+  user_group_memberships = {
+    for user_key in keys(var.identity_users) :
+    user_key => [
+      for group_key, group in var.identity_groups :
+      group_key if contains(group.members, user_key)
+    ]
+  }
 
+  # Groups without members (just the metadata)
+  groups_metadata = {
+    for group_key, group in var.identity_groups :
+    group_key => {
+      description = group.description
+    }
+  }
 }

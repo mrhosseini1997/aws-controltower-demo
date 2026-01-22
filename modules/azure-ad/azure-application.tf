@@ -1,17 +1,32 @@
+#################################################
+# AWS IAM Identity Center Gallery Application
+#################################################
+# Using the gallery template enables SCIM provisioning support
+
+# Look up the AWS IAM Identity Center gallery template
+data "azuread_application_template" "aws_iam_identity_center" {
+  display_name = "AWS IAM Identity Center (successor to AWS Single Sign-On)"
+}
+
+# Create application from the gallery template
 resource "azuread_application" "sso" {
-  display_name     = var.prefix
+  display_name = var.prefix
+  template_id  = data.azuread_application_template.aws_iam_identity_center.template_id
+
   owners           = [data.azuread_client_config.current.object_id]
   logo_image       = var.logo_image_base64
   sign_in_audience = "AzureADMyOrg"
+
   feature_tags {
     custom_single_sign_on = true
     enterprise            = true
-
+    gallery               = true
   }
 
   web {
     redirect_uris = [var.saml_acs]
   }
+
   group_membership_claims = ["SecurityGroup"]
 
   dynamic "app_role" {
@@ -25,6 +40,7 @@ resource "azuread_application" "sso" {
       allowed_member_types = ["User"]
     }
   }
+
   lifecycle {
     ignore_changes = [
       identifier_uris,
@@ -32,15 +48,22 @@ resource "azuread_application" "sso" {
   }
 }
 
+# Create service principal from the gallery template
+# This enables SCIM provisioning capabilities
 resource "azuread_service_principal" "sso_sp" {
-  client_id                    = azuread_application.sso.client_id
+  client_id   = azuread_application.sso.client_id
+  use_existing = true  # Gallery apps may pre-create the SP
+
   app_role_assignment_required = true
   owners                       = [data.azuread_client_config.current.object_id]
   login_url                    = var.login_url != "" ? var.login_url : null
+
   feature_tags {
     custom_single_sign_on = true
     enterprise            = true
+    gallery               = true
   }
+
   preferred_single_sign_on_mode = "saml"
 }
 
